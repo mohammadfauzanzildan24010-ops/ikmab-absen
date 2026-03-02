@@ -1,189 +1,61 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Absen Organisasi</title>
+const express = require("express")
+const cors = require("cors")
+const { createClient } = require("@supabase/supabase-js")
 
-<!-- QR & Scanner -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode"></script>
+const app = express()
+app.use(cors())
+app.use(express.json())
 
-<style>
-body{
-  font-family:Poppins,sans-serif;
-  background:#f1f5f9;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  min-height:100vh;
-}
-.container{
-  background:#fff;
-  padding:30px;
-  width:100%;
-  max-width:400px;
-  border-radius:12px;
-  box-shadow:0 5px 15px rgba(0,0,0,0.1);
-}
-h2{text-align:center;margin-bottom:15px;}
-input, select{width:100%;padding:10px;margin-bottom:10px;border-radius:8px;border:1px solid #ddd;}
-button{width:100%;padding:10px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;}
-button:hover{opacity:0.9;}
-.hidden{display:none;}
-#reader{width:100%;}
-#qrcode{text-align:center;margin-top:15px;}
-.link{text-align:center;margin-top:10px;cursor:pointer;color:#2563eb;}
-</style>
-</head>
-<body>
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_KEY
+const supabase = createClient(supabaseUrl, supabaseKey)
 
-<div class="container">
+app.get("/", (req, res) => {
+  res.send("Backend Absen Aktif 🚀")
+})
 
-<!-- PILIH ROLE -->
-<div id="rolePage">
-  <h2>Login Sebagai</h2>
-  <button onclick="showAnggota()">Anggota</button><br><br>
-  <button onclick="showAdmin()">Admin</button>
-</div>
+// ===================
+// ABSEN ANGGOTA
+// ===================
+app.post("/absen", async (req, res) => {
+  const { nama, nim, prodi, kode } = req.body
 
-<!-- ANGGOTA -->
-<div id="anggotaPage" class="hidden">
-  <h2>Data Anggota</h2>
-  <input type="text" id="nama" placeholder="Nama Lengkap">
-  <input type="text" id="nim" placeholder="NIM">
-  <input type="text" id="prodi" placeholder="Program Studi">
-  <button onclick="masukScan()">Masuk Scan</button>
-  <div class="link" onclick="location.reload()">Kembali</div>
-</div>
+  const { data, error } = await supabase
+    .from("attendance")
+    .insert([{ nama, nim, prodi, kode }])
 
-<!-- SCAN QR -->
-<div id="scanPage" class="hidden">
-  <h2>Scan QR Absen</h2>
-  <div id="reader"></div>
-  <div class="link" onclick="location.reload()">Logout</div>
-</div>
-
-<!-- LOGIN ADMIN -->
-<div id="adminPage" class="hidden">
-  <h2>Login Admin</h2>
-  <input type="email" id="adminEmail" placeholder="Email Admin">
-  <input type="password" id="adminPass" placeholder="Password">
-  <button onclick="loginAdmin()">Login</button>
-  <div class="link" onclick="location.reload()">Kembali</div>
-</div>
-
-<!-- DASHBOARD ADMIN -->
-<div id="adminDash" class="hidden">
-  <h2>Buat QR Absen</h2>
-  <input type="text" id="kodeAbsen" placeholder="Contoh: Rapat-01">
-  <button onclick="buatQR()">Generate QR</button>
-  <div id="qrcode"></div>
-  <div class="link" onclick="location.reload()">Logout</div>
-</div>
-
-</div>
-
-<script>
-const BASE_URL = "https://ikmab-absen-production.up.railway.app"
-
-// ===== NAVIGATION =====
-function showAnggota(){
-  rolePage.classList.add("hidden");
-  anggotaPage.classList.remove("hidden");
-}
-function showAdmin(){
-  rolePage.classList.add("hidden");
-  adminPage.classList.remove("hidden");
-}
-
-// ===== ANGGOTA SCAN =====
-function masukScan(){
-  const nama = document.getElementById("nama").value
-  const nim = document.getElementById("nim").value
-  const prodi = document.getElementById("prodi").value
-
-  if(!nama || !nim || !prodi){
-    alert("Lengkapi semua data!")
-    return
+  if (error) {
+    return res.status(500).json({ error })
   }
 
-  anggotaPage.classList.add("hidden")
-  scanPage.classList.remove("hidden")
+  res.json({ success: true, data })
+})
 
-  const html5QrCode = new Html5Qrcode("reader")
-  html5QrCode.start(
-    { facingMode: "environment" },
-    { fps: 10, qrbox: 250 },
-    async (qrCodeMessage) => {
-      try{
-        const res = await fetch(BASE_URL + "/absen", {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ nama, nim, prodi, kode: qrCodeMessage })
-        })
-        const data = await res.json()
-        alert(data.message || "Absen berhasil!")
-      }catch(err){
-        alert("Gagal mengirim ke server!")
-      }
-      html5QrCode.stop()
-    }
-  )
-}
+// ===================
+// ADMIN KHUSUS
+// ===================
+const admins = [
+  { email: "muzamil123@ikmabk.com", password: "muzamil123" },
+  { email: "ervin123@ikmabk.com", password: "ervin123" },
+  { email: "prista123@ikmabk.com", password: "prista123" }
+]
 
-// ===== LOGIN ADMIN =====
-async function loginAdmin(){
-  const email = document.getElementById("adminEmail").value
-  const password = document.getElementById("adminPass").value
+app.post("/login-admin", (req, res) => {
+  const { email, password } = req.body
 
-  if(!email || !password){
-    alert("Isi email dan password!")
-    return
+  const admin = admins.find(a => a.email === email && a.password === password)
+
+  if(admin){
+    res.json({ message: "Login berhasil" })
+  } else {
+    res.status(401).json({ message: "Email atau password salah" })
   }
+})
 
-  try{
-    const res = await fetch(BASE_URL + "/login-admin", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ email, password })
-    })
-    const data = await res.json()
-
-    if(res.ok){
-      adminPage.classList.add("hidden")
-      adminDash.classList.remove("hidden")
-    }else{
-      alert(data.message || "Email atau password salah")
-    }
-
-  }catch(err){
-    alert("Server tidak merespon!")
-  }
-}
-
-// ===== BUAT QR ADMIN =====
-async function buatQR(){
-  const kode = document.getElementById("kodeAbsen").value
-  if(!kode){
-    alert("Masukkan kode absen!")
-    return
-  }
-
-  try{
-    await fetch(BASE_URL + "/buat-qr", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ kode })
-    })
-  }catch(err){
-    alert("Gagal simpan kode ke server!")
-  }
-
-  document.getElementById("qrcode").innerHTML = ""
-  new QRCode(document.getElementById("qrcode"), { text:kode, width:200, height:200 })
-}
-</script>
-
-</body>
-</html>
+// ===================
+// PORT
+// ===================
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => {
+  console.log("Server jalan di port", PORT)
+})
